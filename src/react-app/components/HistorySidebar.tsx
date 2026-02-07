@@ -14,7 +14,7 @@ import {
 } from '@/react-app/components/ui/dialog';
 import { Input } from '@/react-app/components/ui/input';
 import { Label } from '@/react-app/components/ui/label';
-import { evaluateCode, type EvalResult } from '@/shared/codeEvaluator';
+import type { EvalResult } from '@/shared/codeEvaluator';
 
 interface HistoryItem {
   id: string;
@@ -76,10 +76,16 @@ export default function HistorySidebar({ isOpen, onToggle, onSelectHistory, hist
     if (onSelectHistory) {
       onSelectHistory(item);
     }
-    // Evaluate the code automatically
-    const evalResult = evaluateCode(item.snippet, item.language);
-    setSelectedEvalResult(evalResult);
-    setShowEvalDialog(true);
+
+    // Backend-only requirement: do not run evaluation in the browser.
+    // Use stored result if present.
+    if (item.evalResult) {
+      setSelectedEvalResult(item.evalResult);
+      setShowEvalDialog(true);
+    } else {
+      setSelectedEvalResult(null);
+      setShowEvalDialog(true);
+    }
   };
 
   const handleLogin = () => {
@@ -183,7 +189,7 @@ export default function HistorySidebar({ isOpen, onToggle, onSelectHistory, hist
             <Button
               onClick={() => {
                 if (confirm('Are you sure you want to delete all history? This cannot be undone.')) {
-                  setHistory([]);
+                  updateHistory([]);
                 }
               }}
               variant="ghost"
@@ -312,9 +318,6 @@ export default function HistorySidebar({ isOpen, onToggle, onSelectHistory, hist
                   <p className="text-lg font-bold text-green-300">
                     {selectedEvalResult.successMessage}
                   </p>
-                  <p className="text-sm text-green-200/70 mt-2">
-                    Great job! Your code has no syntax errors.
-                  </p>
                 </div>
               )}
 
@@ -364,6 +367,14 @@ export default function HistorySidebar({ isOpen, onToggle, onSelectHistory, hist
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {!selectedEvalResult && (
+            <div className="bg-slate-800/50 border border-indigo-500/30 rounded p-4">
+              <p className="text-sm text-slate-300">
+                No stored analysis result for this history entry.
+              </p>
             </div>
           )}
 

@@ -26,6 +26,7 @@ import Logo3D from "@/react-app/components/Logo3D";
 import HistorySidebar from "@/react-app/components/HistorySidebar";
 import ChatBox from "@/react-app/components/ChatBox";
 import { getAuthToken } from "@/react-app/lib/auth";
+import type { EvalResult } from "@/shared/codeEvaluator";
 
 type CodeError = {
   line?: number;
@@ -58,7 +59,7 @@ interface HistoryItem {
   snippet: string;
   timestamp: Date;
   saved: boolean;
-  backendResult?: AnalyzeApiResponse;
+  evalResult?: EvalResult;
 }
 
 const SAMPLE_LANGUAGES = [
@@ -163,11 +164,24 @@ export default function AnalyzePage() {
         body: JSON.stringify({ code, language }),
       });
 
-      const data = (await res.json().catch(() => null)) as AnalyzeApiResponse | null;
-      if (!res.ok || !data) {
+      const contentType = res.headers.get("content-type") || "";
+      let data: AnalyzeApiResponse | null = null;
+      let rawText: string | null = null;
+
+      if (contentType.includes("application/json")) {
+        data = (await res.json().catch(() => null)) as AnalyzeApiResponse | null;
+      } else {
+        rawText = await res.text().catch(() => null);
+        // If we got HTML, it's usually due to SPA rewrite swallowing /api.
+        if (rawText && /<!doctype html/i.test(rawText)) {
+          rawText = "Backend endpoint returned HTML (check Vercel rewrites for /api).";
+        }
+      }
+
+      if (!res.ok || (!data && !rawText)) {
         setAnalysis({
           isCorrect: false,
-          errorMessage: "Analysis failed",
+          errorMessage: rawText || data?.message || `Analysis failed (${res.status})`,
           errorHint: "Please try again.",
           encouragement: currentEncouragement,
           errorType: "backend-error",
@@ -179,13 +193,47 @@ export default function AnalyzePage() {
         return;
       }
 
+      if (!data) {
+        setAnalysis({
+          isCorrect: false,
+          errorMessage: rawText || "Analysis failed",
+          errorHint: "Please try again.",
+          encouragement: currentEncouragement,
+          errorType: "backend-error",
+          confidence: "high",
+          story: currentStory,
+          errors: [],
+          guidance: [],
+        });
+        return;
+      }
+
+      const evalResultForHistory: EvalResult = data.isCorrect
+        ? {
+            isValid: true,
+            language: (language as any) || "other",
+            errors: [],
+            warnings: [],
+            guidance: [],
+            successMessage: "Yes you are right",
+          }
+        : {
+            isValid: false,
+            language: (data.details.language as any) || "other",
+            errors: data.details.errors.filter((e) => e.severity !== "warning"),
+            warnings: data.details.errors
+              .filter((e) => e.severity === "warning")
+              .map((e) => e.message),
+            guidance: data.details.guidance,
+          };
+
       const newHistoryItem: HistoryItem = {
         id: Date.now().toString(),
         language,
         snippet: code,
         timestamp: new Date(),
         saved: false,
-        backendResult: data,
+        evalResult: evalResultForHistory,
       };
       setHistory((prev) => [newHistoryItem, ...prev]);
 
