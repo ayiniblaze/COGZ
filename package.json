@@ -39,7 +39,7 @@
   },
   "scripts": {
     "build": "npm run cf-typegen && tsc -b && vite build",
-    "cf-typegen": "node -e \"require('fs').rmSync('worker-configuration.d.ts',{force:true});\" && wrangler types",
+    "cf-typegen": "node -e \"require('fs').rmSync('worker-configuration.d.ts',{force:true});\" && wrangler types --include-runtime false",
     "check": "tsc && vite build && wrangler deploy --dry-run",
     "dev": "vite",
     "knip": "knip",
