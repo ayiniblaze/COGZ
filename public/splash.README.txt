@@ -1,0 +1,8 @@
+Add your splash screenshot here as: public/splash.png
+
+Requirements:
+- Name: splash.png
+- Recommended size: 1920x1080 (or similar)
+- This file is served at: /splash.png
+
+The app shows it on the first page (/) with an accessible ACCESS button that navigates to /start.
